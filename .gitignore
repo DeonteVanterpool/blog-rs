@@ -3,3 +3,4 @@
 blog_posts/
 portfolio_entries/
 templates/
+certbot/*

@@ -3,8 +3,8 @@ services:
   blog:
     image: blog_rs:v0.0.1
     env_file: .env  # Load environment variables from .env file
-  networks:
-    - app-network
+    networks:
+      - app-network
   nginx:
     image: nginx:alpine
     ports:
