@@ -1,0 +1,3 @@
+deontevanterpool.com, www.deontevanterpool.com {
+    reverse_proxy blog:4000
+}

@@ -4,3 +4,5 @@ blog_posts/
 portfolio_entries/
 templates/
 certbot/*
+caddy_data/
+caddy_config/

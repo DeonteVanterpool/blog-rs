@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  blog:
+    build: .
+    env_file: .env
+    networks:
+      - app-network
+
+  caddy:
+    image: caddy:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
