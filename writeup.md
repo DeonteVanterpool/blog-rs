@@ -8,4 +8,4 @@ All services are in src/services. These services contain most of the business lo
 All handlers are in src/handlers.rs. Handlers are responsible for processing requests and returning responses.
 
 ## Decisions
-Caddy was mainly chosen over nginx so that we don't have to worry about maintaining certificates. I didn't want to have to fiddle with docker and getting certbot to automatically renew certificates, as well as mounting them to the correct docker volume. Caddy made this process much simpler and maintainable.
+Caddy was mainly chosen over nginx so that we don't have to worry about maintaining SSL certificates. I didn't want to have to fiddle with docker and getting certbot to automatically renew certificates, as well as mounting them to the correct docker volume. Caddy made this process much simpler and maintainable.
