@@ -1,4 +1,4 @@
-This is the code for running by personal blog / portfolio website [deontevanterpool.com](deontevanterpool.com). Templates, assets, blog posts, and portfolio entries are served from S3 containers. Environment variables must be passed using docker. Example .env file:
+This is the code for running by personal blog / portfolio website [deontevanterpool.com](https://deontevanterpool.com). Templates, assets, blog posts, and portfolio entries are served from S3 containers. Environment variables must be passed using docker. Example .env file:
 ```bash
 BLOG_POSTS_BUCKET=<blog post bucket>
 PORTFOLIO_ENTRIES_BUCKET=<portfolio entries bucket>
