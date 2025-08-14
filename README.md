@@ -10,3 +10,5 @@ AWS_SECRET_ACCESS_KEY=<access key>
 
 To run, use the command `docker-compose up` (or similar). 
 Remember to configure the Caddyfile correctly to point to your own website.
+
+Blog posts are written using markdown and YAML frontmatter for metadata.
