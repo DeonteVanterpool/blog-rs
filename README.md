@@ -7,3 +7,5 @@ AWS_REGION=<region>
 AWS_ACCESS_KEY_ID=<access key id>
 AWS_SECRET_ACCESS_KEY=<access key>
 ```
+
+To run, use the command `docker-compose up` (or similar). 
