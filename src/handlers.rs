@@ -85,6 +85,12 @@ pub async fn get_blog_posts(State(state): State<AppState>, Query(params): Query<
     };
 }
 
+/*
+pub async fn post_subscription(State(state)) -> &'static str {
+
+}
+*/
+
 // private handlers
 // These handlers are not exposed to the public
 

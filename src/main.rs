@@ -75,6 +75,7 @@ async fn main() {
         .route("/portfolio", post(handlers::post_portfolio))
         .route("/portfolio/upload", get(handlers::get_portfolio_upload))
         .route("/portfolio/preview", get(handlers::get_portfolio_preview))
+        // .route("/subcription", post(handlers::post_subcription))
         .with_state(localhost_server_state);
 
     // run our app with hyper, listening globally on port 3000

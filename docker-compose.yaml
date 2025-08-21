@@ -1,13 +1,18 @@
-version: '3.8'
 services:
   blog:
     build: .
     env_file: .env
     networks:
       - app-network
+    image: 
+      ${DOCKER_REGISTRY}/blog:latest
 
   caddy:
-    image: caddy:alpine
+    build: 
+      context: .
+      dockerfile: Dockerfile.caddy
+    image: 
+      ${DOCKER_REGISTRY}/caddy:latest
     ports:
       - "80:80"
       - "443:443"
