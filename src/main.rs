@@ -61,17 +61,17 @@ async fn main() {
         // `GET /` goes to `root`
         .route("/", get(Redirect::permanent("/portfolio")))
         .route("/portfolio", get(handlers::get_portfolio))
-        .route("/blog", get(handlers::get_blog))
-        .route("/blog/{id}", get(handlers::get_blog_post))
-        .route("/blog/posts", get(handlers::get_blog_posts))
+        // .route("/blog", get(handlers::get_blog))
+        // .route("/blog/{id}", get(handlers::get_blog_post))
+        // .route("/blog/posts", get(handlers::get_blog_posts))
         .route("/resume", get(handlers::get_resume))
         .with_state(public_server_state);
 
     let localhost_app = Router::new()
         .route("/", get(Redirect::permanent("/blog/upload")))
-        .route("/blog", post(handlers::post_blog))
-        .route("/blog/upload", get(handlers::get_blog_upload))
-        .route("/blog/preview", get(handlers::get_blog_preview))
+        // .route("/blog", post(handlers::post_blog))
+        // .route("/blog/upload", get(handlers::get_blog_upload))
+        // .route("/blog/preview", get(handlers::get_blog_preview))
         .route("/portfolio", post(handlers::post_portfolio))
         .route("/portfolio/upload", get(handlers::get_portfolio_upload))
         .route("/portfolio/preview", get(handlers::get_portfolio_preview))
