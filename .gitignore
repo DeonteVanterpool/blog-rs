@@ -6,3 +6,7 @@ templates/
 certbot/*
 caddy_data/
 caddy_config/
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
