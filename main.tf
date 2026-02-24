@@ -74,11 +74,10 @@ resource "aws_cloudwatch_log_group" "log_group" {
   name = "/ecs/deontevanterpool-logs"
 }
 
-# ECS task definition (bridge mode)
 resource "aws_ecs_task_definition" "application_task" {
   family                   = "deontevanterpool_task"
-  network_mode             = "bridge"          # changed from awsvpc
-  requires_compatibilities = ["EC2"]           # still valid
+  network_mode             = "bridge"
+  requires_compatibilities = ["EC2"]
   memory                   = 256
   cpu                      = 256
   execution_role_arn       = aws_iam_role.deontevanterpool_ecsTaskExecutionRole.arn
@@ -169,12 +168,7 @@ resource "aws_security_group" "service_security_group" {
     from_port   = 4000
     to_port     = 4000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]   # Direct access to tasks via instance's public IP? No, tasks have separate ENIs.
-    # But with awsvpc, tasks have their own ENI and can have public IPs if assign_public_ip=true.
-    # However, EC2 launch type does not support assign_public_ip=true. So tasks will have private IPs only.
-    # To access them directly, you'd need to go through the host instance's IP and do port mapping (bridge mode) or use a load balancer.
-    # Since you want a static IP, we'll access the application via the host's public IP if we use bridge mode.
-    # But your task definition uses awsvpc. So we need to reconsider.
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
