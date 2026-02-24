@@ -10,3 +10,4 @@ caddy_config/
 .terraform.lock.hcl
 terraform.tfstate
 terraform.tfstate.backup
+.ssh-secret.pem

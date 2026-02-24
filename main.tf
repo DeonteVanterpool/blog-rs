@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
 }
 
 # IAM role for EC2 instances in the ECS cluster
@@ -70,6 +70,10 @@ resource "aws_ecs_cluster" "deontevanterpool_ecs_cluster" {
   name = "deontevanterpool-ecs-cluster"
 }
 
+resource "aws_cloudwatch_log_group" "log_group" {
+  name = "/ecs/deontevanterpool-logs"
+}
+
 # ECS task definition (bridge mode)
 resource "aws_ecs_task_definition" "application_task" {
   family                   = "deontevanterpool_task"
@@ -83,6 +87,15 @@ resource "aws_ecs_task_definition" "application_task" {
       name      = "application"
       image     = aws_ecr_repository.deontevanterpool_ecr_repo.repository_url
       essential = true
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-create-group" = "true"
+          "awslogs-group"        = aws_cloudwatch_log_group.log_group.name
+          "awslogs-region"       = var.region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
       portMappings = [
         {
           containerPort = 4000
@@ -178,10 +191,12 @@ resource "aws_instance" "asims_notebook" {
   subnet_id                   = aws_default_subnet.default_subnet_a.id
   vpc_security_group_ids      = [aws_security_group.ec2_security_group.id]
   associate_public_ip_address = true   # Give it a public IP initially; EIP will override.
+  key_name = "deonte@terraform"
 
   user_data = <<-EOF
     #!/bin/bash
     echo ECS_CLUSTER=${aws_ecs_cluster.deontevanterpool_ecs_cluster.name} >> /etc/ecs/ecs.config
+    systemctl restart ecs
   EOF
 
   tags = {
@@ -200,3 +215,4 @@ output "static_ip" {
   description = "Static public IP of the EC2 instance"
   value       = aws_eip.deontevanterpool_eip.public_ip
 }
+

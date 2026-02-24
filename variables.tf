@@ -9,3 +9,9 @@ variable "instance_type" {
   type        = string
   default     = "t3a.nano"
 }
+
+variable "region" {
+  description = "The region we're deploying to"
+  type        = string
+  default     = "us-east-1"
+}
