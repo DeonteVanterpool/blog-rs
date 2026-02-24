@@ -15,3 +15,27 @@ variable "region" {
   type        = string
   default     = "us-east-1"
 }
+
+variable "portfolio_entries_bucket" {
+  description = "The S3 bucket name we're saving portfolio entries to"
+  type        = string
+  default     = "deontevanterpool-portfolio-entries-bucket"
+}
+
+variable "templates_bucket" {
+  description = "The S3 bucket name we're saving templates to"
+  type        = string
+  default     = "deontevanterpool-templates-bucket"
+}
+
+variable "assets_bucket" {
+  description = "The S3 bucket name we're saving assets to"
+  type        = string
+  default     = "deontevanterpool-assets-bucket"
+}
+
+variable "env_bucket" {
+  description = "The S3 bucket name we're saving env variables to"
+  type        = string
+  default     = "deontevanterpool-env-bucket"
+}

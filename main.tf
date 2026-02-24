@@ -117,7 +117,7 @@ resource "aws_ecs_service" "deontevanterpool_service" {
   launch_type     = "EC2"
   desired_count   = 1
 
-  depends_on = [aws_instance.asims_notebook]
+  depends_on = [aws_instance.deontevanterpool]
 
   lifecycle {
     ignore_changes = [desired_count]
@@ -184,7 +184,7 @@ resource "aws_eip" "deontevanterpool_eip" {
 }
 
 # EC2 instance (single) with EIP
-resource "aws_instance" "asims_notebook" {
+resource "aws_instance" "deontevanterpool" {
   ami                         = data.aws_ami.ecs_optimized.id
   instance_type               = var.instance_type
   iam_instance_profile        = aws_iam_instance_profile.ecs_instance_profile.name
@@ -200,13 +200,13 @@ resource "aws_instance" "asims_notebook" {
   EOF
 
   tags = {
-    Name = "asims-notebook"
+    Name = "deontevanterpool"
   }
 }
 
 # Associate the EIP with the instance
 resource "aws_eip_association" "deontevanterpool_eip_association" {
-  instance_id   = aws_instance.asims_notebook.id
+  instance_id   = aws_instance.deontevanterpool.id
   allocation_id = aws_eip.deontevanterpool_eip.id
 }
 
@@ -216,3 +216,125 @@ output "static_ip" {
   value       = aws_eip.deontevanterpool_eip.public_ip
 }
 
+resource "aws_s3_bucket" "portfolio_entries" {
+  bucket = var.portfolio_entries_bucket
+
+  tags = {
+    Name        = "deontevanterpool"
+  }
+}
+
+resource "aws_s3_bucket" "templates" {
+  bucket = var.templates_bucket
+
+  tags = {
+    Name        = "deontevanterpool"
+  }
+}
+
+resource "aws_s3_bucket" "assets" {
+  bucket = var.assets_bucket
+
+  tags = {
+    Name        = "deontevanterpool"
+  }
+}
+
+resource "aws_s3_bucket" "env" {
+  bucket = var.env_bucket
+
+  tags = {
+    Name        = "deontevanterpool"
+  }
+}
+
+data "aws_iam_policy_document" "origin_bucket_policy" {
+  statement {
+    sid    = "AllowCloudFrontServicePrincipalReadWrite"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+    ]
+
+    resources = [
+      "${aws_s3_bucket.assets.arn}/*",
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.s3_distribution.arn]
+    }
+  }
+}
+
+resource "aws_cloudfront_origin_access_identity" "access_identity" {
+  comment = "deontevanterpool access_identity"
+}
+
+data "aws_iam_policy_document" "s3_policy" {
+  statement {
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.assets.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [aws_cloudfront_origin_access_identity.access_identity.iam_arn]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "bucket_policy" {
+  bucket = aws_s3_bucket.assets.id
+  policy = data.aws_iam_policy_document.s3_policy.json
+}
+
+locals {
+  s3_origin_id = aws_s3_bucket.assets.bucket_regional_domain_name
+}
+
+resource "aws_cloudfront_distribution" "s3_distribution" {
+  origin {
+    domain_name = aws_s3_bucket.assets.bucket_regional_domain_name
+    origin_id   = aws_s3_bucket.assets.bucket_regional_domain_name
+
+    s3_origin_config {
+      origin_access_identity = aws_cloudfront_origin_access_identity.access_identity.cloudfront_access_identity_path
+    }
+  }
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = "deontevanterpool_s3_distribution"
+
+  # AWS Managed Caching Policy (CachingDisabled)
+  default_cache_behavior {
+    # Using the CachingDisabled managed policy ID:
+    cache_policy_id        = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = local.s3_origin_id
+    viewer_protocol_policy = "allow-all"
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "whitelist"
+      locations        = ["US", "CA", "GB", "DE"]
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+
+  tags = {
+    Name = "deontevanterpool-assets-cloudfront-distribution"
+  }
+}
