@@ -70,13 +70,13 @@ resource "aws_ecs_cluster" "deontevanterpool_ecs_cluster" {
   name = "deontevanterpool-ecs-cluster"
 }
 
-# ECS task definition
+# ECS task definition (bridge mode)
 resource "aws_ecs_task_definition" "application_task" {
   family                   = "deontevanterpool_task"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["EC2"]
-  memory                   = 4096
-  cpu                      = 2048
+  network_mode             = "bridge"          # changed from awsvpc
+  requires_compatibilities = ["EC2"]           # still valid
+  memory                   = 256
+  cpu                      = 256
   execution_role_arn       = aws_iam_role.deontevanterpool_ecsTaskExecutionRole.arn
   container_definitions    = jsonencode([
     {
@@ -86,13 +86,29 @@ resource "aws_ecs_task_definition" "application_task" {
       portMappings = [
         {
           containerPort = 4000
+          hostPort      = 4000      # explicitly map to the same port on the host
           protocol      = "tcp"
         }
       ]
-      memory    = 4096
-      cpu       = 2048
+      memory    = 256
+      cpu       = 256
     }
   ])
+}
+
+# ECS service (no network_configuration)
+resource "aws_ecs_service" "deontevanterpool_service" {
+  name            = "deontevanterpool-app-service"
+  cluster         = aws_ecs_cluster.deontevanterpool_ecs_cluster.id
+  task_definition = aws_ecs_task_definition.application_task.arn
+  launch_type     = "EC2"
+  desired_count   = 1
+
+  depends_on = [aws_instance.asims_notebook]
+
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
 }
 
 # Default VPC and subnets
@@ -177,30 +193,6 @@ resource "aws_instance" "asims_notebook" {
 resource "aws_eip_association" "deontevanterpool_eip_association" {
   instance_id   = aws_instance.asims_notebook.id
   allocation_id = aws_eip.deontevanterpool_eip.id
-}
-
-# ECS service (EC2 launch type)
-resource "aws_ecs_service" "deontevanterpool_service" {
-  name            = "deontevanterpool-app-service"
-  cluster         = aws_ecs_cluster.deontevanterpool_ecs_cluster.id
-  task_definition = aws_ecs_task_definition.application_task.arn
-  launch_type     = "EC2"
-  desired_count   = 1
-
-  # No network_configuration needed for EC2 launch type unless using awsvpc.
-  # But since your task uses awsvpc, we must specify subnets and security groups.
-  network_configuration {
-    subnets         = [aws_default_subnet.default_subnet_a.id]
-    security_groups = [aws_security_group.service_security_group.id]
-    # assign_public_ip is not supported for EC2 launch type, so omit.
-  }
-
-  # Ensure the instance is created before the service tries to place tasks
-  depends_on = [aws_instance.asims_notebook]
-
-  lifecycle {
-    ignore_changes = [desired_count]
-  }
 }
 
 # Output the static IP

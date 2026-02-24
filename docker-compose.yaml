@@ -1,18 +1,18 @@
 services:
-  blog:
+  deontevanterpool:
     build: .
     env_file: .env
     networks:
       - app-network
     image: 
-      ${DOCKER_REGISTRY}/blog:latest
+      ${DOCKER_REGISTRY}/deontevanterpool-ecr-repo:latest
 
   caddy:
     build: 
       context: .
       dockerfile: Dockerfile.caddy
     image: 
-      ${DOCKER_REGISTRY}/caddy:latest
+      ${DOCKER_REGISTRY}/deontevanterpool-caddy-service:latest
     ports:
       - "80:80"
       - "443:443"
