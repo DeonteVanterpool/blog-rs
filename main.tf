@@ -63,6 +63,7 @@ data "aws_ami" "ecs_optimized" {
 # ECR repository
 resource "aws_ecr_repository" "deontevanterpool_ecr_repo" {
   name = "deontevanterpool-ecr-repo"
+  force_delete = true
 }
 
 # ECS cluster
@@ -74,36 +75,59 @@ resource "aws_cloudwatch_log_group" "log_group" {
   name = "/ecs/deontevanterpool-logs"
 }
 
+# Corrected task definition with bridge mode, links, and hostPort
 resource "aws_ecs_task_definition" "application_task" {
   family                   = "deontevanterpool_task"
-  network_mode             = "bridge"
+  network_mode             = "bridge"                     # back to bridge
   requires_compatibilities = ["EC2"]
-  memory                   = 256
-  cpu                      = 256
+  cpu                      = "256"
+  memory                   = "400"
   execution_role_arn       = aws_iam_role.deontevanterpool_ecsTaskExecutionRole.arn
-  container_definitions    = jsonencode([
+
+  container_definitions = jsonencode([
     {
-      name      = "application"
+      name      = "deontevanterpool"
       image     = aws_ecr_repository.deontevanterpool_ecr_repo.repository_url
       essential = true
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          "awslogs-create-group" = "true"
-          "awslogs-group"        = aws_cloudwatch_log_group.log_group.name
-          "awslogs-region"       = var.region
-          "awslogs-stream-prefix" = "ecs"
+          "awslogs-group"         = aws_cloudwatch_log_group.log_group.name
+          "awslogs-region"        = var.region
+          "awslogs-stream-prefix" = "app"
         }
       }
+      environmentFiles = [
+        {
+          value = "arn:aws:s3:::deontevanterpool-env-bucket/.env"
+          type  = "s3"
+        }
+      ]
       portMappings = [
         {
           containerPort = 4000
-          hostPort      = 4000      # explicitly map to the same port on the host
+          hostPort      = 4000      # optional but useful for direct debugging
           protocol      = "tcp"
         }
       ]
-      memory    = 256
-      cpu       = 256
+      cpu        = 128
+      memory     = 256
+      memoryReservation = 128
+    },
+    {
+      name      = "caddy"
+      image     = "076224130336.dkr.ecr.us-east-1.amazonaws.com/caddy:latest"
+      essential = true
+      links     = ["deontevanterpool"]
+      portMappings = [
+        { containerPort = 80, hostPort = 80, protocol = "tcp" },
+        { containerPort = 443, hostPort = 443, protocol = "tcp" }
+      ]
+      # No "command" – default entrypoint reads /etc/caddy/Caddyfile
+      dependsOn = [{ containerName = "deontevanterpool", condition = "START" }]
+      cpu        = 128
+      memory     = 128
+      memoryReservation = 64
     }
   ])
 }
@@ -115,6 +139,8 @@ resource "aws_ecs_service" "deontevanterpool_service" {
   task_definition = aws_ecs_task_definition.application_task.arn
   launch_type     = "EC2"
   desired_count   = 1
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent = 100
 
   depends_on = [aws_instance.deontevanterpool]
 
@@ -130,7 +156,44 @@ resource "aws_default_subnet" "default_subnet_a" {
   availability_zone = "us-east-1a"
 }
 
-# Security group for the EC2 instance (and for tasks if needed)
+# Security group for ECS tasks (still defined but not used – safe to keep)
+resource "aws_security_group" "service_security_group" {
+  name        = "ecs-service-sg"
+  description = "Allow HTTP/HTTPS and port 4000 to tasks"
+  vpc_id      = aws_default_vpc.default_vpc.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 4000
+    to_port     = 4000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Elastic IP for the EC2 instance
+resource "aws_eip" "deontevanterpool_eip" {
+  domain = "vpc"
+}
+
+# Security group for the EC2 instance (allows web traffic)
 resource "aws_security_group" "ec2_security_group" {
   name        = "ec2-security-group"
   description = "Allow traffic to the instance and tasks"
@@ -150,31 +213,24 @@ resource "aws_security_group" "ec2_security_group" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]   # for SSH; adjust as needed
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-}
-
-# Security group for ECS tasks (attached to task ENIs)
-resource "aws_security_group" "service_security_group" {
-  name        = "ecs-service-sg"
-  description = "Allow traffic to tasks on port 4000"
-  vpc_id      = aws_default_vpc.default_vpc.id
-
-  ingress {
-    from_port   = 4000
-    to_port     = 4000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# Elastic IP for the EC2 instance
-resource "aws_eip" "deontevanterpool_eip" {
-  domain = "vpc"
 }
 
 # EC2 instance (single) with EIP
@@ -187,10 +243,14 @@ resource "aws_instance" "deontevanterpool" {
   associate_public_ip_address = true   # Give it a public IP initially; EIP will override.
   key_name = "deonte@terraform"
 
+  depends_on = [
+    aws_iam_role_policy_attachment.ecs_instance_role_attach
+  ]
+
   user_data = <<-EOF
     #!/bin/bash
+    sleep 10
     echo ECS_CLUSTER=${aws_ecs_cluster.deontevanterpool_ecs_cluster.name} >> /etc/ecs/ecs.config
-    systemctl restart ecs
   EOF
 
   tags = {
@@ -206,61 +266,46 @@ resource "aws_eip_association" "deontevanterpool_eip_association" {
 
 # Output the static IP
 output "static_ip" {
-  description = "Static public IP of the EC2 instance"
+  description = "Static public IP of the EC2 instance (point your domain here)"
   value       = aws_eip.deontevanterpool_eip.public_ip
 }
 
+# S3 buckets (unchanged)
 resource "aws_s3_bucket" "portfolio_entries" {
   bucket = var.portfolio_entries_bucket
-
-  tags = {
-    Name        = "deontevanterpool"
-  }
+  force_destroy = true
+  tags = { Name = "deontevanterpool" }
 }
 
 resource "aws_s3_bucket" "templates" {
   bucket = var.templates_bucket
-
-  tags = {
-    Name        = "deontevanterpool"
-  }
+  force_destroy = true
+  tags = { Name = "deontevanterpool" }
 }
 
 resource "aws_s3_bucket" "assets" {
   bucket = var.assets_bucket
-
-  tags = {
-    Name        = "deontevanterpool"
-  }
+  force_destroy = true
+  tags = { Name = "deontevanterpool" }
 }
 
 resource "aws_s3_bucket" "env" {
   bucket = var.env_bucket
-
-  tags = {
-    Name        = "deontevanterpool"
-  }
+  force_destroy = true
+  tags = { Name = "deontevanterpool" }
 }
 
+# CloudFront and S3 policies (unchanged)
 data "aws_iam_policy_document" "origin_bucket_policy" {
   statement {
     sid    = "AllowCloudFrontServicePrincipalReadWrite"
     effect = "Allow"
-
     principals {
       type        = "Service"
       identifiers = ["cloudfront.amazonaws.com"]
     }
-
-    actions = [
-      "s3:GetObject",
-      "s3:PutObject",
-    ]
-
-    resources = [
-      "${aws_s3_bucket.assets.arn}/*",
-    ]
-
+    actions = ["s3:GetObject", "s3:PutObject"]
+    resources = ["${aws_s3_bucket.assets.arn}/*"]
     condition {
       test     = "StringEquals"
       variable = "AWS:SourceArn"
@@ -277,7 +322,6 @@ data "aws_iam_policy_document" "s3_policy" {
   statement {
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.assets.arn}/*"]
-
     principals {
       type        = "AWS"
       identifiers = [aws_cloudfront_origin_access_identity.access_identity.iam_arn]
@@ -297,38 +341,51 @@ locals {
 resource "aws_cloudfront_distribution" "s3_distribution" {
   origin {
     domain_name = aws_s3_bucket.assets.bucket_regional_domain_name
-    origin_id   = aws_s3_bucket.assets.bucket_regional_domain_name
-
+    origin_id   = local.s3_origin_id
     s3_origin_config {
       origin_access_identity = aws_cloudfront_origin_access_identity.access_identity.cloudfront_access_identity_path
     }
   }
-  enabled             = true
-  is_ipv6_enabled     = true
-  comment             = "deontevanterpool_s3_distribution"
-
-  # AWS Managed Caching Policy (CachingDisabled)
+  enabled         = true
+  is_ipv6_enabled = true
+  comment         = "deontevanterpool_s3_distribution"
   default_cache_behavior {
-    # Using the CachingDisabled managed policy ID:
     cache_policy_id        = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
     target_origin_id       = local.s3_origin_id
     viewer_protocol_policy = "allow-all"
   }
-
   restrictions {
     geo_restriction {
       restriction_type = "whitelist"
       locations        = ["US", "CA", "GB", "DE"]
     }
   }
-
   viewer_certificate {
     cloudfront_default_certificate = true
   }
+  tags = { Name = "deontevanterpool-assets-cloudfront-distribution" }
+}
 
-  tags = {
-    Name = "deontevanterpool-assets-cloudfront-distribution"
+# Additional IAM policy for S3 env file
+data "aws_iam_policy_document" "ecs_task_execution_s3_env" {
+  statement {
+    effect = "Allow"
+    actions = ["s3:GetObject", "s3:ListBucket"]
+    resources = [
+      aws_s3_bucket.env.arn,
+      "${aws_s3_bucket.env.arn}/*"
+    ]
   }
+}
+
+resource "aws_iam_policy" "ecs_task_execution_s3_env" {
+  name   = "deontevanterpool-ecs-task-execution-s3-env"
+  policy = data.aws_iam_policy_document.ecs_task_execution_s3_env.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_execution_s3_env_attach" {
+  role       = aws_iam_role.deontevanterpool_ecsTaskExecutionRole.name
+  policy_arn = aws_iam_policy.ecs_task_execution_s3_env.arn
 }

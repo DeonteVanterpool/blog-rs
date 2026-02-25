@@ -59,8 +59,8 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
-        .route("/", get(Redirect::permanent("/portfolio")))
-        .route("/portfolio", get(handlers::get_portfolio))
+        .route("/", get(handlers::get_portfolio))
+        .route("/portfolio", get(Redirect::permanent("/")))
         // .route("/blog", get(handlers::get_blog))
         // .route("/blog/{id}", get(handlers::get_blog_post))
         // .route("/blog/posts", get(handlers::get_blog_posts))

@@ -32,6 +32,8 @@ impl AppState {
             .unwrap();
         let template_objects = Self::aws_list_objects(client, templates_bucket).await.unwrap();
         
+        let blog_posts = Vec::new();
+        /*
         let blog_posts = BlogPostService::parse_many(
             future::join_all(
                 blog_post_objects
@@ -43,6 +45,7 @@ impl AppState {
             .map(|result| result.unwrap())
             .collect(),
         );
+        */
 
         let portfolio_entries = PortfolioService::parse_many(
             future::join_all(
