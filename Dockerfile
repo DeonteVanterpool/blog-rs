@@ -10,7 +10,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/deontevanterpool .
 
 # Install CA certificates for SSL verification
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
 COPY Caddyfile /etc/caddy/Caddyfile
 
@@ -18,4 +18,7 @@ COPY Caddyfile /etc/caddy/Caddyfile
 EXPOSE 4000
 
 CMD ["./deontevanterpool"]
+
+HEALTHCHECK --interval=30s --timeout=10s \
+  CMD curl -f http://localhost:4000/ || exit 1
 

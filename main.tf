@@ -89,6 +89,12 @@ resource "aws_ecs_task_definition" "application_task" {
       name      = "deontevanterpool"
       image     = aws_ecr_repository.deontevanterpool_ecr_repo.repository_url
       essential = true
+      healthCheck = {
+        command = ["CMD-SHELL","curl -f http://0.0.0.0:4000 || exit 1"]
+        interval = 30,
+        timeout = 10,
+        retries = 3
+      }
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -123,8 +129,16 @@ resource "aws_ecs_task_definition" "application_task" {
         { containerPort = 80, hostPort = 80, protocol = "tcp" },
         { containerPort = 443, hostPort = 443, protocol = "tcp" }
       ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.log_group.name
+          "awslogs-region"        = var.region
+          "awslogs-stream-prefix" = "caddy"
+        }
+      }
       # No "command" – default entrypoint reads /etc/caddy/Caddyfile
-      dependsOn = [{ containerName = "deontevanterpool", condition = "START" }]
+      dependsOn = [{ containerName = "deontevanterpool", condition = "HEALTHY" }]
       cpu        = 128
       memory     = 128
       memoryReservation = 64
